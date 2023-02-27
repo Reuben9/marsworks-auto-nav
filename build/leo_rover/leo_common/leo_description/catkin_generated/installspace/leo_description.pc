@@ -1,0 +1,8 @@
+prefix=/home/marsworks/catkin_ws/install
+
+Name: leo_description
+Description: Description of leo_description
+Version: 2.2.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

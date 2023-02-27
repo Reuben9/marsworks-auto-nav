@@ -1,0 +1,8 @@
+prefix=/home/marsworks/catkin_ws/devel
+
+Name: ros_cv_bridge
+Description: Description of ros_cv_bridge
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

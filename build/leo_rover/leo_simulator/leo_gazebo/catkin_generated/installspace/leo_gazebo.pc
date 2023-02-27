@@ -1,0 +1,8 @@
+prefix=/home/marsworks/catkin_ws/install
+
+Name: leo_gazebo
+Description: Description of leo_gazebo
+Version: 1.1.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

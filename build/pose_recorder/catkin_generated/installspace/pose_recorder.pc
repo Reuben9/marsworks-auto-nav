@@ -1,0 +1,8 @@
+prefix=/home/marsworks/catkin_ws/install
+
+Name: pose_recorder
+Description: Description of pose_recorder
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

@@ -1,0 +1,8 @@
+prefix=/home/marsworks/catkin_ws/devel
+
+Name: leo_fw
+Description: Description of leo_fw
+Version: 1.2.1
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 
