@@ -1,6 +1,11 @@
 {
     "files.associations": {
         "core": "cpp",
-        "unordered_map": "cpp"
+        "unordered_map": "cpp",
+        "array": "cpp",
+        "deque": "cpp",
+        "list": "cpp",
+        "vector": "cpp",
+        "string_view": "cpp"
     }
 }

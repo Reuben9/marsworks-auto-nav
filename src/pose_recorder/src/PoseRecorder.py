@@ -3,7 +3,7 @@
 import csv
 import rospy
 from gazebo_msgs.msg import ModelStates
-from geometry_msgs.msg import Pose
+from geometry_msgs.msg import PoseStamped
 from tf.transformations import euler_from_quaternion
 
 # Ground Truth (GT) and Pose Estimate (PE) filenames
@@ -27,8 +27,9 @@ def callback1(data):
     print("...")
 
 def callback2(data):
-    position = data.position
-    orientation = data.orientation
+    time = data.header.stamp 
+    position = data.pose.position
+    orientation = data.pose.orientation
 
     x_predicted = position.x
     y_predicted = position.y 
@@ -39,19 +40,19 @@ def callback2(data):
     
     with open(FILENAME_PE, mode="a") as csv_file:
         csv_writer = csv.writer(csv_file, delimiter=",")
-        csv_writer.writerow([x_predicted, y_predicted, z_predicted, yaw])
+        csv_writer.writerow([time, x_predicted, y_predicted, z_predicted, yaw])
     print("...")
 
 def listener():
     # Initialise files
-    filename = FILENAME_GT
+    filename = FILENAME_PE
     with open(filename, mode="w") as csv_file:
         csv_writer = csv.writer(csv_file, delimiter=",")
-        csv_writer.writerow(["X", "Y", "Z", "Yaw"])
+        csv_writer.writerow(["TimeStamp", "X", "Y", "Z", "Yaw"])
         
     rospy.init_node("listener", anonymous=True)
     rospy.Subscriber("gazebo/model_states", ModelStates, callback1)
-    rospy.Subscriber("ORBSLAM3/pose_estimate", Pose, callback2)
+    rospy.Subscriber("orb_pose", PoseStamped, callback2)
     rospy.spin()
 
 
