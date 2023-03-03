@@ -33,6 +33,13 @@
 
 #include"../../../include/System.h"
 #include"../include/ImuTypes.h"
+#include"Converter.h"
+
+#include<geometry_msgs/PoseStamped.h>
+#include<geometry_msgs/Point.h>
+#include<geometry_msgs/Quaternion.h>
+#include <Eigen/Geometry>
+#include <tf/transform_broadcaster.h>
 
 using namespace std;
 
@@ -55,6 +62,9 @@ public:
     void GrabImageRight(const sensor_msgs::ImageConstPtr& msg);
     cv::Mat GetImage(const sensor_msgs::ImageConstPtr &img_msg);
     void SyncWithImu();
+    void InitialisePub(ros::NodeHandle);
+
+    ros::Publisher pose_pub;
 
     queue<sensor_msgs::ImageConstPtr> imgLeftBuf, imgRightBuf;
     std::mutex mBufMutexLeft,mBufMutexRight;
@@ -75,6 +85,8 @@ int main(int argc, char **argv)
 {
   ros::init(argc, argv, "Stereo_Inertial");
   ros::NodeHandle n("~");
+  ros::NodeHandle n_pub;
+  
   ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info);
   bool bEqual = false;
   if(argc < 4 || argc > 5)
@@ -141,15 +153,30 @@ int main(int argc, char **argv)
   ros::Subscriber sub_imu = n.subscribe("/imu", 1000, &ImuGrabber::GrabImu, &imugb); 
   ros::Subscriber sub_img_left = n.subscribe("/camera/left/image_raw", 100, &ImageGrabber::GrabImageLeft,&igb);
   ros::Subscriber sub_img_right = n.subscribe("/camera/right/image_raw", 100, &ImageGrabber::GrabImageRight,&igb);
+  igb.InitialisePub(n_pub);
 
   std::thread sync_thread(&ImageGrabber::SyncWithImu,&igb);
 
   ros::spin();
 
+  // Stop all threads
+  SLAM.Shutdown();
+
+  SLAM.SaveTrajectoryEuRoC("FrameTrajectory_EuRoC_Format.txt");
+
+  ros::shutdown();
+
   return 0;
 }
 
 
+
+void ImageGrabber::InitialisePub(ros::NodeHandle n)
+{
+  // Create a ROS publisher to publish estimated pose
+  pose_pub = n.advertise<geometry_msgs::PoseStamped>("/orb_pose", 5);
+  // pose_pub = n.advertise<Sophus::SE3f>("/ORBSLAM3/pose_estimate", 5);
+}
 
 void ImageGrabber::GrabImageLeft(const sensor_msgs::ImageConstPtr &img_msg)
 {
@@ -195,9 +222,13 @@ cv::Mat ImageGrabber::GetImage(const sensor_msgs::ImageConstPtr &img_msg)
 
 void ImageGrabber::SyncWithImu()
 {
+  // Sophus::SE3f T_;
+  // geometry_msgs::Pose R;
+
   const double maxTimeDiff = 0.01;
   while(1)
   {
+    geometry_msgs::PoseStamped pose; // For outputting to ROS
     cv::Mat imLeft, imRight;
     double tImLeft = 0, tImRight = 0;
     if (!imgLeftBuf.empty()&&!imgRightBuf.empty()&&!mpImuGb->imuBuf.empty())
@@ -230,6 +261,7 @@ void ImageGrabber::SyncWithImu()
           continue;
 
       this->mBufMutexLeft.lock();
+      pose.header.stamp = imgLeftBuf.front()->header.stamp; // For ROS publish timestamp
       imLeft = GetImage(imgLeftBuf.front());
       imgLeftBuf.pop();
       this->mBufMutexLeft.unlock();
@@ -267,8 +299,59 @@ void ImageGrabber::SyncWithImu()
         cv::remap(imRight,imRight,M1r,M2r,cv::INTER_LINEAR);
       }
 
-      mpSLAM->TrackStereo(imLeft,imRight,tImLeft,vImuMeas);
 
+      cv::Mat T_, R_, t_;
+      Sophus::SE3f T;
+
+      T = mpSLAM->TrackStereo(imLeft,imRight,tImLeft,vImuMeas);
+
+      T_ = ORB_SLAM3::Converter::toCvMat(T.matrix());
+
+      if (!(T_.empty())) {
+
+          cv::Size s = T_.size();
+          if ((s.height >= 3) && (s.width >= 3)) {
+            R_ = T_.rowRange(0,3).colRange(0,3).t();
+            t_ = -R_*T_.rowRange(0,3).col(3);
+            vector<float> q = ORB_SLAM3::Converter::toQuaternion(R_);
+            float scale_factor=1.0;
+            tf::Transform transform;
+            transform.setOrigin(tf::Vector3(t_.at<float>(0, 0)*scale_factor, t_.at<float>(0, 1)*scale_factor, t_.at<float>(0, 2)*scale_factor));
+            tf::Quaternion tf_quaternion(q[0], q[1], q[2], q[3]);
+            transform.setRotation(tf_quaternion);
+
+            // pose.header.stamp = imLeft.header.stamp;
+            pose.header.frame_id ="ORB_SLAM3_STEREO_INERTIAL";
+            tf::poseTFToMsg(transform, pose.pose);
+            pose_pub.publish(pose);
+          }
+      }
+
+      /*std::vector<MapPoint*> tracked_points;
+      tracked_points = mpSLAM->GetTrackedMapPoints();
+      std::cout << tracked_points << endl;
+
+      // Get position data
+      Eigen::Vector3f translation = T.translation();
+      geometry_msgs::Point p;
+      p.x = translation.x();
+      p.y = translation.y();
+      p.z = translation.z();
+      R.position = p;
+
+      // Get orientation data
+      Eigen::Quaternionf quaternion = T.unit_quaternion();
+      geometry_msgs::Quaternion q;
+      q.w = quaternion.w();
+      q.x = quaternion.x();
+      q.y = quaternion.y();
+      q.z = quaternion.z();
+      R.orientation = q;
+
+      // Publish to ROS topic
+      pose_pub.publish(R);*/
+
+      // std::cout << T << std::endl;
       std::chrono::milliseconds tSleep(1);
       std::this_thread::sleep_for(tSleep);
     }
@@ -282,3 +365,5 @@ void ImuGrabber::GrabImu(const sensor_msgs::ImuConstPtr &imu_msg)
   mBufMutex.unlock();
   return;
 }
+
+

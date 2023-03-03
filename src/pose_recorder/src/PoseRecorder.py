@@ -8,7 +8,7 @@ from tf.transformations import euler_from_quaternion
 
 # Ground Truth (GT) and Pose Estimate (PE) filenames
 FILENAME_GT = "/home/marsworks/catkin_ws/ground_truth.csv"
-FILENAME_PE = "/home/marsworks/catkin_ws/pose_estimate.csv"
+FILENAME_PE = "/home/marsworks/catkin_ws/pose_estimate.txt"
 
 def callback1(data):
     position = data.pose[1].position
@@ -27,7 +27,7 @@ def callback1(data):
     print("...")
 
 def callback2(data):
-    time = data.header.stamp 
+    t = data.header.stamp 
     position = data.pose.position
     orientation = data.pose.orientation
 
@@ -37,18 +37,26 @@ def callback2(data):
 
     (roll, pitch, yaw) = euler_from_quaternion([orientation.x,
                     orientation.y, orientation.z, orientation.w], "sxyz")
-    
+    """
     with open(FILENAME_PE, mode="a") as csv_file:
         csv_writer = csv.writer(csv_file, delimiter=",")
         csv_writer.writerow([time, x_predicted, y_predicted, z_predicted, yaw])
+    """
+    with open(FILENAME_PE, mode="a") as f:
+        f.write(str(t) + " " + str(x_predicted) + " " + str(y_predicted) + " " + str(z_predicted) + " " + 
+        str(orientation.x) + " " + str(orientation.y) + " " + str(orientation.z) + " " + str(orientation.w) + "\n")
     print("...")
 
 def listener():
     # Initialise files
     filename = FILENAME_PE
+    """
     with open(filename, mode="w") as csv_file:
         csv_writer = csv.writer(csv_file, delimiter=",")
         csv_writer.writerow(["TimeStamp", "X", "Y", "Z", "Yaw"])
+    """
+    with open(filename, mode="w") as f:
+        pass
         
     rospy.init_node("listener", anonymous=True)
     rospy.Subscriber("gazebo/model_states", ModelStates, callback1)
